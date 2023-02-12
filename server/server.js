@@ -15,7 +15,7 @@ const connection = mysql.createConnection({
     multipleStatements: true
 })
 
-//X-API-Key verifikasiyasi 
+//X-API-Key verification
 const x_api_key = process.env.X_API_KEY;
 connection.connect((err) => {
     if (!err) {
@@ -34,12 +34,12 @@ const apiKeyVerificationMiddleware = (req, res, next) => {
 app.use(apiKeyVerificationMiddleware);
 
 
-//shekillerin serverde gorunmesi
+//Show images from static page and use their links
 app.use('/images', express.static('imgs'))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }));
 
-//userin geydiyyatdan kecmesi
+//User registration. We do not show it in UI but it is only for backend developers in order to register users.
 app.post("/admin-panel/register", (req, res) => {
     const { userName, password } = req.body;
     const salt = bcrypt.genSaltSync(15);
@@ -48,14 +48,14 @@ app.post("/admin-panel/register", (req, res) => {
         userName: userName.toLowerCase(),
         password: hash
     }
-    // burada userin serverde olub olmamasini ilkin olaraq yoxlayirig
+    // First of all we are verifying whether the user exists in the database
     connection.query("SELECT * FROM user_login WHERE userName=?", [userName], (err, data) => {
         if (err) {
             return res.status(400).send(err)
         } else {
             if (data.length > 0) {
                 res.send('The Username is taken. Try another')
-            } else {// eger yoxdursa o zaman qeydiyyatdan kecirilir
+            } else {// if the user does not exist then the registration can be done
                 connection.query("INSERT INTO user_login SET ?", user, (err, data) => {
                     if (err) return res.status(500).send({ error: "Internal Server Error" })
                     res.send("User sucessfully registered")
@@ -65,17 +65,18 @@ app.post("/admin-panel/register", (req, res) => {
     })
 });
 
-//login olmasi
+//For logging in
 app.post("/login", (req, res) => {
     const { userName, password } = req.body;
-    //ilk olarag userName-in databazada olmasini yoxlayirig
+    //First of all we are checking whether the user is in the database
     connection.query("SELECT * FROM user_login WHERE userName=?", [userName], (err, data) => {
         if (err) {
             return res.status(500).json({ error: "An error occurred while checking the user credentials." });
         }
         if (data.length === 0) {
             res.status(401).json({ error: "Invalid Username" })
-        } else {//eger varsa ondan sonra parolu yoxlayirig ve dogru paroldursa jwt token yaradib fronta gonderirik
+        } else {//If it exists then we will check the provided password. In case if all is true,then we are generating
+            //a static jwt token then sending it to the fron end side
             const hashedPassword = data[0].password;
             const verification = bcrypt.compareSync(password, hashedPassword)
             if (verification) {
@@ -92,7 +93,7 @@ app.post("/login", (req, res) => {
     })
 
 })
-//Homepage girish ucun atilan requestde her categoriyadan bir coin gosteririk
+//Here we are requesting to database to give us one of each category for showing it in homePage
 app.get("/", (req, res) => {
     connection.query(`SELECT 
     category,
@@ -109,7 +110,7 @@ app.get("/", (req, res) => {
     })
 });
 
-//homepagede kateqoriyanin onunde show all-a clicklenerse hemin categoriyaya uygun coinlerin alinmasi ucun query
+//The querry for the case of clicking show all button in front of each category
 app.get('/coins/:category', (req, res) => {
     const { category } = req.params;
     connection.query(`Select * from coins WHERE category LIKE '%${category}%';`, (err, data) => {
@@ -118,7 +119,7 @@ app.get('/coins/:category', (req, res) => {
     })
 });
 
-// eger her hansi coinin id-e gore sorgu atilarsa hemin coinin gonderilmesi ucun query
+// The query for making request by the id of the coin
 app.get('/coin/:id', (req, res) => {
     const { id } = req.params;
     connection.query(`SELECT * FROM coins WHERE id=${id};`, (err, data) => {
@@ -128,19 +129,19 @@ app.get('/coin/:id', (req, res) => {
 });
 
 
-//axtarish ucun sorgu. eger sorguda yalniz esas searhc inputdan deyer gelirse o q= sheklinde gelir
+//Request for the search. if in the request there is only search input value then we assign it as q=
 app.get('/search', (req, res) => {
     const { q, ...rest } = req.query;
-    //eger advanced search secilibse parametrlere uygun cavab gelir
+    //in case if there is advanced-search then we are making the request based on the search parameters
     let query = `SELECT * FROM coins WHERE isRemoved=0 AND price BETWEEN ${rest.priceFrom} AND ${rest.priceTo} AND year BETWEEN ${rest.yearFrom} AND ${rest.yearTo}`
 
-    //eger ashagidaki deyerler secilibse onlar da query-e elave edilsin
+    //In case if the following values has been chosen then we are adding them into our query
     rest.category ? query += ` AND category="${rest.category}"` : null;
     rest.country ? query += ` AND country="${rest.country}"` : null;
     rest.metal ? query += ` AND metal="${rest.metal}"` : null;
     query += ';';
     if (Object.keys(rest).length === 0) {
-        // eger q-dan bashgasi gelmezse o zaman adi searchin cavabi gelsin
+        //In case if there is only q value then search will be made only by q
         connection.query(`SELECT * FROM coins WHERE (coinName LIKE '%${q}%') OR (longDesc LIKE '%${q}%') AND isRemoved=0 ;`, (err, data) => {
             if (err) return res.status(500).send({ found: 0 })
             res.json(data)
@@ -153,11 +154,11 @@ app.get('/search', (req, res) => {
     }
 });
 
-//burada biz advanced filterdeki selectlere konkret option vermek ucun sorgu atirig.
-//Meqsed advanced filterdeki searchlerin optionlari yalnizca data bazaya elave olunan coinlerin olkelerim, kategoriyalari
-//ve metal secimini elave edirik. Sebeb ise elave ederken  kategoriya, olke ve metal input olaraq gosteririk. Bundan elave
-// bezi coinlerin istehsal olundugu olkelerin adlari bugunku olke adlarindan ferglenir. Meselen The Belgian Congo.
-//
+//As we put the select options in the advanced filter, we have made this side in order to get the options from database.
+//The main purpose is giving to the user the option to make the advanced search only by the given countries,
+//categories and metal options. The reason for doing that is because the admin can add these three values in a normal
+//input. Then there can be coins produced in the past when the country names were different from today.
+//For example The Belgian Congo
 app.get('/countryList', (req, res) => {
     connection.query('SELECT DISTINCT country FROM coins WHERE isRemoved=0 order by country;', (err, countryOptions) => {
         if (err) return res.status(500).send({ error: "Couldn't connect to Database" })
@@ -177,7 +178,7 @@ app.get('/countryList', (req, res) => {
     })
 });
 
-// Admin panelde edit hisseye gedende en son elave olunan coinleri almag ucun yazilan query
+//The request for the edit page of admin panel. We are getting the coins by their last added time(so bigger id comes first) 
 app.get("/admin-panel/editCoin", (req, res) => {
     connection.query(`SELECT * FROM coins WHERE isRemoved=0 ORDER BY id DESC;`, (err, data) => {
         if (err) return res.status(500).send({ error: "Couldn't connect to Database" })
@@ -185,7 +186,7 @@ app.get("/admin-panel/editCoin", (req, res) => {
     })
 });
 
-// coinlerin elave olunmasi ucun sorgu
+// Request for adding coins
 app.post('/addCoin', (req, res) => {
     let newData = req.body;
     for (const key in req.body) {
@@ -202,7 +203,7 @@ app.post('/addCoin', (req, res) => {
     })
 });
 
-// coinlerin id-e uygun deyishdirilmesi ucun sorgu
+// Modifiying the coins by their id
 app.put('/editCoin/:id', (req, res) => {
     const { id } = req.params;
     let updatedData = req.body;
@@ -218,7 +219,7 @@ app.put('/editCoin/:id', (req, res) => {
 
 
 
-
+//Deleting the coins. Here we do not delete it permanently from database but just not showing it in UI
 app.delete('/delete/:id', (req, res) => {
     const { id } = req.params;
     connection.query("UPDATE coins SET isRemoved=true WHERE id=? ", [id], (err, data) => {

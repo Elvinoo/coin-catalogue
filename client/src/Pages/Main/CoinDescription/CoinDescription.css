@@ -1,0 +1,70 @@
+.coin-images img {
+    height: 300px;
+    width: 300px;
+}
+
+.coin-images img:first-child {
+    margin-bottom: 24px;
+}
+
+.description-page {
+    max-width: 782px;
+    display: flex;
+    justify-content: space-between;
+    padding-left: 200px;
+}
+
+.coin-description {
+    padding: 19px 43px;
+    max-width: 452px;
+    background: rgba(196, 196, 196, 0.5);
+}
+
+.coin-description h1 {
+    font-weight: 700;
+    font-size: 28px;
+    line-height: 33px;
+    margin-bottom: 20px;
+
+}
+
+.coin-description p {
+    font-weight: 400;
+    font-size: 12px;
+    line-height: 125%;
+    max-width: 366px;
+    margin-top: 13.5px;
+}
+
+.coin-description table {
+    width: 366px;
+    margin-bottom: 145px;
+    margin-top: 40px;
+    border-collapse: collapse;
+}
+
+.coin-description table tr:nth-child(odd) {
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.coin-description table tr:nth-child(even) {
+    border-top: 0.5px solid #B1ABAB;
+    border-bottom: 0.5px solid #B1ABAB;
+}
+
+.coin-description table td {
+    font-weight: 400;
+    font-size: 10px;
+    width: 50%;
+    padding: 5px;
+}
+
+.coin-description table tr td:first-child {
+    border-right: 0.5px solid #B1ABAB;
+}
+
+.back-to-list {
+    font-weight: 400;
+    font-size: 10px;
+    line-height: 12px;
+}

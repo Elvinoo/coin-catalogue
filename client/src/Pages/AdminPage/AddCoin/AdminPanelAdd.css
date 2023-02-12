@@ -1,0 +1,60 @@
+/* .admin-panel-container {
+    padding: 52px 46px 52px 52px;
+    max-width: 1280px;
+} */
+
+
+.admin-panel-main {
+    margin-top: 25px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.admin-panel-main section {
+    display: flex;
+    flex-direction: column;
+    width: 31.5%;
+}
+
+
+.admin-panel-main input {
+    margin-bottom: 20px;
+}
+
+.admin-panel-main textarea {
+    padding: 16px;
+    width: 374px;
+    font-weight: 300;
+    font-size: 20px;
+    line-height: 121%;
+    margin-bottom: 20px;
+    height: 136px;
+    border: 1px solid #000000;
+    box-sizing: border-box;
+    resize: none;
+}
+
+
+.admin-panel-main select {
+    width: 374px;
+    height: 48px;
+    font-weight: 300;
+    font-size: 20px;
+    line-height: 121%;
+    padding-left: 16px;
+    margin-bottom: 216px;
+}
+
+
+
+.admin-panel-main .buttons {
+    display: flex;
+    justify-content: center;
+    column-gap: 30px;
+}
+
+.admin-panel-main .buttons button:last-child {
+    background-color: #E1E1E1;
+    color: #000000;
+
+}

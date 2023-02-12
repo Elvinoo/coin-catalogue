@@ -14,6 +14,8 @@ const connection = mysql.createConnection({
     database: process.env.DB_NAME,
     multipleStatements: true
 })
+
+//X-API-Key verifikasiyasi 
 const x_api_key = process.env.X_API_KEY;
 connection.connect((err) => {
     if (!err) {
@@ -21,11 +23,7 @@ connection.connect((err) => {
     } else {
         console.log(err)
     }
-})
-app.use('/images', express.static('imgs'))
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }));
-
+});
 const apiKeyVerificationMiddleware = (req, res, next) => {
     const apiKey = req.headers['api-key'];
     if (apiKey !== x_api_key) {
@@ -34,22 +32,30 @@ const apiKeyVerificationMiddleware = (req, res, next) => {
     next();
 };
 app.use(apiKeyVerificationMiddleware);
+
+
+//shekillerin serverde gorunmesi
+app.use('/images', express.static('imgs'))
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }));
+
+//userin geydiyyatdan kecmesi
 app.post("/admin-panel/register", (req, res) => {
     const { userName, password } = req.body;
-    /* res.send({ "userName": userName, "password": password }) */
     const salt = bcrypt.genSaltSync(15);
     const hash = bcrypt.hashSync(password, salt);
     const user = {
         userName: userName.toLowerCase(),
         password: hash
     }
+    // burada userin serverde olub olmamasini ilkin olaraq yoxlayirig
     connection.query("SELECT * FROM user_login WHERE userName=?", [userName], (err, data) => {
         if (err) {
             return res.status(400).send(err)
         } else {
             if (data.length > 0) {
                 res.send('The Username is taken. Try another')
-            } else {
+            } else {// eger yoxdursa o zaman qeydiyyatdan kecirilir
                 connection.query("INSERT INTO user_login SET ?", user, (err, data) => {
                     if (err) return res.status(500).send({ error: "Internal Server Error" })
                     res.send("User sucessfully registered")
@@ -58,16 +64,18 @@ app.post("/admin-panel/register", (req, res) => {
         }
     })
 });
-app.post("/login", (req, res) => {
 
+//login olmasi
+app.post("/login", (req, res) => {
     const { userName, password } = req.body;
+    //ilk olarag userName-in databazada olmasini yoxlayirig
     connection.query("SELECT * FROM user_login WHERE userName=?", [userName], (err, data) => {
         if (err) {
             return res.status(500).json({ error: "An error occurred while checking the user credentials." });
         }
         if (data.length === 0) {
             res.status(401).json({ error: "Invalid Username" })
-        } else {
+        } else {//eger varsa ondan sonra parolu yoxlayirig ve dogru paroldursa jwt token yaradib fronta gonderirik
             const hashedPassword = data[0].password;
             const verification = bcrypt.compareSync(password, hashedPassword)
             if (verification) {
@@ -84,7 +92,7 @@ app.post("/login", (req, res) => {
     })
 
 })
-
+//Homepage girish ucun atilan requestde her categoriyadan bir coin gosteririk
 app.get("/", (req, res) => {
     connection.query(`SELECT 
     category,
@@ -101,7 +109,7 @@ app.get("/", (req, res) => {
     })
 });
 
-
+//homepagede kateqoriyanin onunde show all-a clicklenerse hemin categoriyaya uygun coinlerin alinmasi ucun query
 app.get('/coins/:category', (req, res) => {
     const { category } = req.params;
     connection.query(`Select * from coins WHERE category LIKE '%${category}%';`, (err, data) => {
@@ -110,7 +118,7 @@ app.get('/coins/:category', (req, res) => {
     })
 });
 
-
+// eger her hansi coinin id-e gore sorgu atilarsa hemin coinin gonderilmesi ucun query
 app.get('/coin/:id', (req, res) => {
     const { id } = req.params;
     connection.query(`SELECT * FROM coins WHERE id=${id};`, (err, data) => {
@@ -120,14 +128,19 @@ app.get('/coin/:id', (req, res) => {
 });
 
 
+//axtarish ucun sorgu. eger sorguda yalniz esas searhc inputdan deyer gelirse o q= sheklinde gelir
 app.get('/search', (req, res) => {
     const { q, ...rest } = req.query;
+    //eger advanced search secilibse parametrlere uygun cavab gelir
     let query = `SELECT * FROM coins WHERE isRemoved=0 AND price BETWEEN ${rest.priceFrom} AND ${rest.priceTo} AND year BETWEEN ${rest.yearFrom} AND ${rest.yearTo}`
+
+    //eger ashagidaki deyerler secilibse onlar da query-e elave edilsin
     rest.category ? query += ` AND category="${rest.category}"` : null;
     rest.country ? query += ` AND country="${rest.country}"` : null;
     rest.metal ? query += ` AND metal="${rest.metal}"` : null;
     query += ';';
     if (Object.keys(rest).length === 0) {
+        // eger q-dan bashgasi gelmezse o zaman adi searchin cavabi gelsin
         connection.query(`SELECT * FROM coins WHERE (coinName LIKE '%${q}%') OR (longDesc LIKE '%${q}%') AND isRemoved=0 ;`, (err, data) => {
             if (err) return res.status(500).send({ found: 0 })
             res.json(data)
@@ -140,7 +153,11 @@ app.get('/search', (req, res) => {
     }
 });
 
-
+//burada biz advanced filterdeki selectlere konkret option vermek ucun sorgu atirig.
+//Meqsed advanced filterdeki searchlerin optionlari yalnizca data bazaya elave olunan coinlerin olkelerim, kategoriyalari
+//ve metal secimini elave edirik. Sebeb ise elave ederken  kategoriya, olke ve metal input olaraq gosteririk. Bundan elave
+// bezi coinlerin istehsal olundugu olkelerin adlari bugunku olke adlarindan ferglenir. Meselen The Belgian Congo.
+//
 app.get('/countryList', (req, res) => {
     connection.query('SELECT DISTINCT country FROM coins WHERE isRemoved=0 order by country;', (err, countryOptions) => {
         if (err) return res.status(500).send({ error: "Couldn't connect to Database" })
@@ -160,7 +177,7 @@ app.get('/countryList', (req, res) => {
     })
 });
 
-
+// Admin panelde edit hisseye gedende en son elave olunan coinleri almag ucun yazilan query
 app.get("/admin-panel/editCoin", (req, res) => {
     connection.query(`SELECT * FROM coins WHERE isRemoved=0 ORDER BY id DESC;`, (err, data) => {
         if (err) return res.status(500).send({ error: "Couldn't connect to Database" })
@@ -168,7 +185,7 @@ app.get("/admin-panel/editCoin", (req, res) => {
     })
 });
 
-
+// coinlerin elave olunmasi ucun sorgu
 app.post('/addCoin', (req, res) => {
     let newData = req.body;
     for (const key in req.body) {
@@ -185,7 +202,7 @@ app.post('/addCoin', (req, res) => {
     })
 });
 
-
+// coinlerin id-e uygun deyishdirilmesi ucun sorgu
 app.put('/editCoin/:id', (req, res) => {
     const { id } = req.params;
     let updatedData = req.body;
